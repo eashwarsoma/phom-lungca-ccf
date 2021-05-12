@@ -1,0 +1,12 @@
+# datafiles
+*.csv
+*.xlsx
+*.rds
+
+#R/Rstudio files
+.RData
+.Rapp.history
+.Rhistory
+.Rproj.user
+
+
