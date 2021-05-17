@@ -20,9 +20,6 @@ inds.to.drop <- which(patients.filenames %in% c(
 patients.filenames <- patients.filenames[-inds.to.drop]
 
 
-
-
-
 #Each list item are patient(s)
 #There are variable number of patients that can be told apart 
 #By the preceeding number
@@ -45,7 +42,7 @@ filepaths.from.date.folder <- function(date.folder.file) {
   scansdf <- merge(CTdf, RTdf, by="ID")
   
   #Drop duplicate rows
-  scansdf <- unique(scansdf[ , 1:3])
+  scansdf <- unique(scansdf[, 1:3])
   
   #Obtaining the indices of the CT and RT scan file name from the original string
   inds.CT <- lapply(scansdf$CT, grep, date.folder.file)
@@ -53,14 +50,13 @@ filepaths.from.date.folder <- function(date.folder.file) {
   
   #List to collect file names
   list.obs <- list()
-  for (i in 1:dim(scansdf)[1]) {
+  for (i in seq_len(dim(scansdf)[1])) {
     list.obs[[i]] <- c(date.folder.file[inds.CT[[i]]], date.folder.file[inds.RT[[i]]])
   }
   
-  names(list.obs) <- scansdf[,1]
+  names(list.obs) <- scansdf[, 1]
   
   return(list.obs)
-
 }
 
 #Getting the Exact CT and RT St Filenames
@@ -73,27 +69,27 @@ outersect <- function(x, y) {
 }
 
 #For those studies with multiple RTst, trying to select the corrected file
-for (i in 1:length(true.file.names)) {
-  for (j in 1:length(true.file.names[[i]]))
+for (i in seq_len(length(true.file.names))) {
+  for (j in seq_len(length(true.file.names[[i]]))) {
     if (length(true.file.names[[i]][[j]]) > 2) {
-    rt.ind <- grep("RTst", true.file.names[[i]][[j]])
-    cor.ind <- grep("COR", true.file.names[[i]][[j]], ignore.case = TRUE)
+      rt.ind <- grep("RTst", true.file.names[[i]][[j]])
+      cor.ind <- grep("COR", true.file.names[[i]][[j]], ignore.case = TRUE)
     
-    #Only drop stuff if the drop value has stuff
-    drop <- outersect(cor.ind, rt.ind)
+      #Only drop stuff if the drop value has stuff
+      drop <- outersect(cor.ind, rt.ind)
       if (length(drop) != 0) {
-      true.file.names[[i]][[j]] <- true.file.names[[i]][[j]][-drop]
+        true.file.names[[i]][[j]] <- true.file.names[[i]][[j]][-drop]
       }
     }
-
+  }
 }
 
 #Revising the list structure so that each patient is a list item
 #Entry 1 is scan ID, E2 is CT, E3 is RT
 list.filenames <- list()
 counter <- 1 #Here to get good indexing
-for (i in 1:length(true.file.names)) {
-  for (j in 1:length(true.file.names[[i]])) {
+for (i in seq_len(length(true.file.names))) {
+  for (j in seq_len(length(true.file.names[[i]]))) {
       list.filenames[[counter]] <- c(names(true.file.names[[i]][j]), true.file.names[[i]][[j]])
       counter <- counter + 1
   }
@@ -118,14 +114,11 @@ rtst.dcmlist <- lapply(list.filenames, function (x) list.files(x[3], full.names 
 rtst.dcmlist.edit <- lapply(rtst.dcmlist, function (x) x[grep(".dcm", x)])
 
 #Updating the elements within needed.scans.filenames
-for (i in 1:length(list.filenames)) {
+for (i in seq_len(length(list.filenames))) {
   list.filenames[[i]][3] <- rtst.dcmlist.edit[[i]][1]
 }
 
-
 saveRDS(list.filenames, "filenames.rds")
-
 
 #Code to Removing redundant files
 #CONTINUE
-
