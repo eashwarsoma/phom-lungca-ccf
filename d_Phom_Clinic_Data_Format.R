@@ -1,3 +1,4 @@
+
 library(ripserr)
 library(TDAstats)
 library(reshape2)
@@ -31,12 +32,24 @@ list.all.data <- list()
 for (i in seq_len(length(list.raw.phom))) {
   get_ID <- list.raw.phom[i] %>%
     names %>%
-    strsplit(split = "_", n = 2) %>%
+    stringr::str_split(pattern = "_", n = 2) %>%
     unlist
   
   list.all.data[[i]] <- c(Patient.ID = get_ID[1],
                           Scan.ID = get_ID[2])
 }
+
+
+#Putting in the scan dates
+filenames <- readRDS("filenames.rds")
+filenames.full <- unlist(filenames)
+for (i in seq_len(length(list.raw.phom))) {
+  date <- grep(list.all.data[[i]][["Scan.ID"]], filenames.full, value = TRUE) %>% grep("_CT_", ., value = TRUE) %>% str_extract("\\d\\d\\d\\d-\\d\\d-\\d\\d")
+  
+  list.all.data[[i]] <- c(list.all.data[[i]],
+                          Scan.Date = date)
+}
+
 
 #Function to count total features that exist at each threshold value
 cubical.total.feat.counter <- function(phom, minimum, maximum, res) {
@@ -126,7 +139,6 @@ ggplot(topfeatcurv.melt, aes(x = filtration, y = feature.count, color = feature.
 #Clinic Data Retrieve
 key <- read_excel("/Volumes/Cancr/physics/Peng/Lung_SBRT/Radiomics/Key.xlsx")
 clinical.data <- read_excel("clinic_data.xlsx")
-date_IDs <- readRDS("Scan_Date_ID_Key.rds")
 
 #Incorporate Clinical Variables
 for (i in seq_len(length(list.all.data))) {
@@ -136,7 +148,7 @@ for (i in seq_len(length(list.all.data))) {
   
   #Getting the Scan Date
   #All analysis time intervals grounded against scan Date
-  scan.date <- as.Date(date_IDs[which(date_IDs$PatID == pid), "date"])
+  scan.date <- as.Date(list.all.data[[i]][["Scan.Date"]])
   
   #Getting the MRN
   MRN <- as.numeric(key[which(key$anon_id == pid), ]["ccf_number"])
@@ -185,10 +197,18 @@ for (i in seq_len(length(list.all.data))) {
       Histo = clinic.MRN$Histology...189,
       Path = clinic.MRN$Pathology,
       
+      #Mutations
+      ALK = clinic.MRN$`ALK Mutation`,
+      BRAF = clinic.MRN$`BRAF Mutation`,
+      EGFR = clinic.MRN$`EGFR Mutation`,
+      KRAS = clinic.MRN$`Colorectal KRAS mutation`,
+      
+      
       #Survival Information
       Vital.Status = clinic.MRN$`Survival Status`, 
       OS.Length = as.Date(clinic.MRN$`Date of Death`) - scan.date,
       Date.Death = clinic.MRN$`Date of Death`,
+      Death.Cause = clinic.MRN$`Cause of Death`,
       
       #Progression Information
       Progression.Status = ifelse(is.na(clinic.MRN$`1st Failure Date...678`), "Stable", "Progressed"), 
@@ -230,7 +250,7 @@ for (i in seq_len(length(list.all.data))) {
 
 #Seeing How many entries dont have clinical data
 #Follow up with Peng on This
-no.MRN.found <- which(sapply(list.all.data, length) == 4)
+no.MRN.found <- which(sapply(list.all.data, length) == 5)
 
 #Removing the entries with No Clinical Data
 list.all.data <- list.all.data[-no.MRN.found]
@@ -396,6 +416,7 @@ for (i in seq_len(length(list.all.data))) {
   list.all.data[[i]] <- c(list.all.data[[i]], feat.curve.moms = list(feat.curve.moms))
 }
 
+#COME BACK AND REFINE DUPS!!
 #Removing DUplicates and Keeping  Most uptodate record
 dups <- list.all.data %>%
   sapply(FUN = function(x) x[["Patient.ID"]]) %>%
@@ -403,18 +424,6 @@ dups <- list.all.data %>%
   which
 list.all.data <- list.all.data[-dups]
 
-which(sapply(list.all.data, function (x) dim(x[["clinic.data"]])[1]) == 2)
-#42 221 435 468 477 528 650 725 726 763 have multiple clinical records, keeping earliest scan
-list.all.data[[42]]$clinic.data <- list.all.data[[42]]$clinic.data[1, ]
-list.all.data[[221]]$clinic.data <- list.all.data[[221]]$clinic.data[1, ]
-list.all.data[[435]]$clinic.data <- list.all.data[[435]]$clinic.data[2, ]
-list.all.data[[468]]$clinic.data <- list.all.data[[468]]$clinic.data[2, ]
-list.all.data[[477]]$clinic.data <- list.all.data[[477]]$clinic.data[1, ]
-list.all.data[[528]]$clinic.data <- list.all.data[[528]]$clinic.data[1, ]
-list.all.data[[650]]$clinic.data <- list.all.data[[650]]$clinic.data[2, ]
-list.all.data[[725]]$clinic.data <- list.all.data[[725]]$clinic.data[2, ]
-list.all.data[[726]]$clinic.data <- list.all.data[[726]]$clinic.data[2, ]
-list.all.data[[763]]$clinic.data <- list.all.data[[763]]$clinic.data[1, ]
 
 
 #Saving the RDS File

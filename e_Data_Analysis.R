@@ -20,11 +20,9 @@ library(ggplotify)
 library(png)
 library(rstatix)
 library(ggfortify)
-<<<<<<< HEAD
 library(stringr)
 library(hablar)
-=======
->>>>>>> 72af4f36942260c26257abb83c725a1433290221
+
 
 #Function to linearly scale something to 0 to 1
 normalize <- function(col) {
@@ -52,24 +50,17 @@ moment.extracter <- function(list.data, mom.dims, mom.types) {
   moms.to.choose.mod <- paste("\\.", moms.to.choose, "\\.", sep = "")
   
   #Logical Indices of dimension curves
-  dim.inds <- list.data$feat.curve.moms %>%
-    names %>%
-    str_detect(paste(dim.to.choose, collapse = "|"))
+  dim.inds <- str_detect(names(list.data$feat.curve.moms), paste(dim.to.choose, collapse = "|"))
   
   #Logical Indices of moments to choose
-  moms.dims.ind <- list.data$feat.curve.moms[dim.inds] %>%
-    unlist(recursive = FALSE) %>%
-    names %>%
-    str_detect(paste(moms.to.choose.mod, collapse = "|"))
+  moms.dims.ind  <- str_detect(names(unlist(list.data$feat.curve.moms[dim.inds], recursive = FALSE)), paste(moms.to.choose.mod, collapse = "|"))
   
   #Lists of the moments we want
-  cap.list <- list.data$feat.curve.moms[dim.inds] %>%
-    unlist(recursive = FALSE) %>%
-    extract(moms.dims.ind)
+  cap.list <- unlist(list.data$feat.curve.moms[dim.inds], recursive = FALSE)[moms.dims.ind]
   
   #Extracting into a vector
   vec.col <- numeric()
-  for (i in seq_len(length(cap.list))) {
+  for (i in 1:length(cap.list)) {
     vec.col <- c(vec.col, cap.list[[i]])
   }
   
@@ -79,31 +70,32 @@ moment.extracter <- function(list.data, mom.dims, mom.types) {
 }
 
 
+
+
 #Function to extract clinical variables from list element
 #Possible variables here; need to use lapply to get full etraction
 patient.vars <- c("Sex", "Ethnicity", "Age.Diag", "BMI",
                   "Years.Smoke", "KPS", "HGB", "CCI",
-                  "Prev.Canc.Diag", "Num.Prev.Canc.Diag")
+                  "Prev.Canc.Diag", "Num.Prev.Canc.Diag", "Scan.Date", 
+                  "DODiag", "Date.Rad.Start", "Death.Cause")
 treatment.vars <- c("Prior.Surg", "Post.Rad.Chemo", "Pre.Rad.Chemo",
                     "Rad.Intent", "Tot.Dose")
 tumor.vars <- c("CT.Size", "T.Stage", "N.Stage", "M.Stage",
-                "Overall.Stage", "Histo", "Path")
+                "Overall.Stage", "Histo", "Path", "ALK", "BRAF", "EGFR", "KRAS")
 event.vars <- c("Vital.Status", "OS.Length",
                 "Progression.Status", "PFS.Length", "PFS.Failure.Type",
                 "Local.Status", "Local.Length", 
                 "Lobar.Status", "Nodal.Status", "Distant.Status", 
-                "First.Met", "Update.Time", "Followup.Time", "Alive.Time")
+                "First.Met", "Update.Time", "Followup.Time", "Alive.Time",
+                "Date.Death", "PFS.Date", "Date.Local.Failure", "Date.Lobar", "Date.Nodal", 
+                "Date.Last.Update", "Date.Last.Followup", "Date.Last.Known.Alive")
 
 clinic.extracter <- function(list.data, patient.vars, treatment.vars, tumor.vars, event.vars) {
   
-  #Keeping patient ID
   PID <- list.data$Patient.ID
   
   #Placeholder Dataframe
   plac <- list.data$clinic.data[c(event.vars, patient.vars, treatment.vars, tumor.vars)]
-  
-  #Storing Names
-  names <- names(plac)
   
   #1 0 convention for events
   # Distant.Failed = Distant Control
@@ -112,23 +104,22 @@ clinic.extracter <- function(list.data, patient.vars, treatment.vars, tumor.vars
   # Failed = Local Control
   # Dead = Vital Status
   # Progressed = Progression Free Survival
-  new.vec <- case_when(
-    plac %in% c("Distant.Failed", "Lobar.Failed", "Nodal.Failed", "Failed", "Dead", "Progressed") ~ "1",
-    plac %in% c("Distant.Controlled", "Lobar.Controlled", "Nodal.Controlled", "Controlled", "Alive", "Stable") ~ "0",
-    TRUE ~ as.character(plac)
-  )
+  fails.ind <- plac %in% c("Distant.Failed", "Lobar.Failed", "Nodal.Failed", "Failed", "Dead", "Progressed")
+  controlled.ind <- plac %in% c("Distant.Controlled", "Lobar.Controlled", "Nodal.Controlled", "Controlled", "Alive", "Stable")
   
-  names(new.vec) <- names
+  plac[fails.ind] <- 1
   
-  fin.vec <- c(PID = PID, new.vec)
+  plac[controlled.ind] <- 0
+  
+  
+  fin.vec <- cbind.data.frame(PID = PID, plac)
   
   return(fin.vec)
   
 }
-#COMEBACK WITH VARIABLE SELECTION
 
-#Replicating Old Paper Results
-<<<<<<< HEAD
+
+####Creating Clinical and Moment Data Frame####
 moms.list <- lapply(list.all.data, moment.extracter, mom.dims = mom.dim.vars, mom.types = mom.types.vars)
 moms.df <- as.data.frame(do.call(rbind, moms.list))
 
@@ -148,40 +139,35 @@ moms.df.corr[, -1] <- moms.df.corr[, -1] %>% log()
 
 clinic.list <- lapply(list.all.data, clinic.extracter, patient.vars = patient.vars, treatment.vars = treatment.vars,
                       tumor.vars = tumor.vars, event.vars = event.vars)
-clinic.df <- as.data.frame(do.call(rbind, clinic.list))
-=======
-moms.list <- lapply(list.all.data, moment.extracter,
-                    mom.dims = "dim0", mom.types = "raw")
-moms.df <- do.call(rbind, moms.list) %>% as.data.frame
+clinic.df <- do.call(rbind.data.frame, clinic.list)
 
-clinic.list <- lapply(list.all.data, clinic.extracter, patient.vars = c("Sex", "Age.Diag"), treatment.vars = NULL,
-                      tumor.vars = "Overall.Stage", event.vars = c("Vital.Status", "OS.Length", "Followup.Time"))
-clinic.df <- do.call(rbind, clinic.list) %>% as.data.frame
->>>>>>> 72af4f36942260c26257abb83c725a1433290221
-
-#making proper numeric
-clinic.df[, c("Vital.Status", "OS.Length", "Progression.Status", "PFS.Length", 
-              "Local.Status", "Local.Length", "Lobar.Status", 
-              "Nodal.Status", "Distant.Status", "Update.Time", 
-              "Followup.Time", "Alive.Time", "Age.Diag", "CCI",
-              "BMI", "Years.Smoke", "HGB", "Num.Prev.Canc.Diag", "Tot.Dose", "CT.Size")] <- 
-  sapply(clinic.df[, c("Vital.Status", "OS.Length", "Progression.Status", "PFS.Length", 
-                "Local.Status", "Local.Length", "Lobar.Status", 
-                "Nodal.Status", "Distant.Status", "Update.Time", 
-                "Followup.Time", "Alive.Time", "Age.Diag", "CCI",
-                "BMI", "Years.Smoke", "HGB", "Num.Prev.Canc.Diag", "Tot.Dose", "CT.Size")], as.numeric)
 
 
 #Combining moments and clinical vairable data frames
 clinic.mom.df <- join(clinic.df, moms.df.corr)
 
+
 sapply(clinic.mom.df, function(x) paste(sum(!is.na(x)), "/", length(x)))
 
-#Creating a corrected Interval column that uses survival or follow up time
-<<<<<<< HEAD
-clinic.mom.df$Correct.Interval <- as.numeric(ifelse(clinic.mom.df$Vital.Status == "1", clinic.mom.df$OS.Length, clinic.mom.df$Followup.Time))
 
-#Basic Cox Model
+#Creating a corrected Interval column that uses survival or follow up time
+#Making other correct.intervals as well (Continue)
+clinic.mom.df$Survival.Correct.Interval <- as.numeric(ifelse(clinic.mom.df$Vital.Status == 1, 
+                                                             clinic.mom.df$Date.Death - clinic.mom.df$DODiag, 
+                                                             clinic.mom.df$Date.Last.Known.Alive - clinic.mom.df$DODiag))
+
+clinic.mom.df$PFS.Correct.Interval <- as.numeric(ifelse(clinic.mom.df$Progression.Status == 1, 
+                                                        clinic.mom.df$PFS.Date - clinic.mom.df$Date.Rad.Start, 
+                                                        difftime(clinic.mom.df$Date.Last.Update, clinic.mom.df$Date.Rad.Start, units = "days")))
+
+clinic.mom.df$Local.Correct.Interval <- as.numeric(ifelse(clinic.mom.df$Local.Status == 1, 
+                                                        clinic.mom.df$Date.Local.Failure - clinic.mom.df$Date.Rad.Start, 
+                                                        difftime(clinic.mom.df$Date.Last.Update, clinic.mom.df$Date.Rad.Start, units = "days")))
+
+
+
+####Running Cox Model for OS, PFS, Local Control, and Cancer Specific Survival####
+#Basic Cox Model Function
 univ.Cox <- function(stat, int, vars, dat) {
   #List object to collect data
   list.UR <- list()
@@ -237,65 +223,52 @@ multv.Cox <- function(stat, int, vars, dat) {
   return(df.mr)
 }
 
+vars.to.check <- c("raw.1st.dim0.mean", "raw.1st.dim1.mean", 
+                   "cent.2nd.dim0.variance", "cent.2nd.dim1.variance", 
+                   "Age.Diag", "Sex", "KPS", "CCI", "Overall.Stage")
 
-univ.Cox("Vital.Status", "Correct.Interval", 
-         c("raw.1st.dim0.mean", "raw.1st.dim1.mean", 
-           "cent.2nd.dim0.variance", "cent.2nd.dim1.variance", 
-           "Age.Diag", "Sex", 
-           "KPS", "CCI", 
-           "Overall.Stage"), clinic.mom.df) %>% signif(3) %>% as.data.frame %>%
+#UV and MV Models for Survival
+univ.Cox("Vital.Status", "Survival.Correct.Interval", vars.to.check, clinic.mom.df) %>% signif(2) %>% as.data.frame %>%
   mutate(signif = ifelse(pval < .05, "*", "ns"))
 
-multv.Cox("Vital.Status", "Correct.Interval", 
-         c("raw.1st.dim0.mean", "raw.1st.dim1.mean", 
-           "cent.2nd.dim0.variance", "cent.2nd.dim1.variance", 
-           "Age.Diag", "Sex", 
-           "KPS", "CCI", 
-           "Overall.Stage"), clinic.mom.df) %>% signif(3) %>% as.data.frame %>%
+multv.Cox("Vital.Status", "Survival.Correct.Interval", vars.to.check, clinic.mom.df) %>% signif(2) %>% as.data.frame %>%
   mutate(signif = ifelse(pval < .05, "*", "ns"))
 
+#UV and MV Models for PFS
+univ.Cox("Progression.Status", "PFS.Correct.Interval", vars.to.check, clinic.mom.df) %>% signif(2) %>% as.data.frame %>%
+  mutate(signif = ifelse(pval < .05, "*", "ns"))
 
+multv.Cox("Progression.Status", "PFS.Correct.Interval", vars.to.check, clinic.mom.df) %>% signif(2) %>% as.data.frame %>%
+  mutate(signif = ifelse(pval < .05, "*", "ns"))
 
+#UV and MV Models for Local Control
+univ.Cox("Local.Status", "Local.Correct.Interval", vars.to.check, clinic.mom.df) %>% signif(2) %>% as.data.frame %>%
+  mutate(signif = ifelse(pval < .05, "*", "ns"))
 
+multv.Cox("Local.Status", "Local.Correct.Interval", c("raw.1st.dim0.mean", "Overall.Stage"), clinic.mom.df) %>% signif(2) %>% as.data.frame %>%
+  mutate(signif = ifelse(pval < .05, "*", "ns"))
 
-#Lasso model
+#UV and MV Models for Cancer Specific Survival
+#Getting the indices indicating cancer death
+#there are likely more, I just can't be sure, need to follow up'
+canc <- grep("canc", clinic.mom.df$Death.Cause)
+met <- grep("met", clinic.mom.df$Death.Cause)
+CA <- grep("CA", clinic.mom.df$Death.Cause, fixed = TRUE)
+non <- grep("non", clinic.mom.df$Death.Cause, fixed = TRUE)
+not <- grep("not", clinic.mom.df$Death.Cause, fixed = TRUE)
+inds.for.sure <- setdiff(union(union(canc, met), CA), union(non, not))
 
+#Also including the alive patients
+inds.alive <- which(clinic.mom.df$Vital.Status == 0)
 
+clinic.mom.df.cancer.spec <- clinic.mom.df[union(inds.alive, inds.for.sure), ]
 
-=======
-clinic.mom.df <- clinic.mom.df %>%
-  mutate(Correct.Interval = ifelse(Vital.Status == "1", OS.Length, Followup.Time),
-         Correct.Interval = as.numeric(Correct.Interval),
-         Age.Diag = as.numeric(Age.Diag),
-         raw.1st.dim0.mean = as.numeric(raw.1st.dim0.mean),
-         raw.2nd.dim0 = as.numeric(raw.2nd.dim0),
-         raw.3rd.dim0 = as.numeric(raw.3rd.dim0),
-         raw.4th.dim0 = as.numeric(raw.4th.dim0),
-         Vital.Status = as.numeric(Vital.Status))
+univ.Cox("Vital.Status", "Survival.Correct.Interval", vars.to.check, clinic.mom.df.cancer.spec) %>% signif(2) %>% as.data.frame %>%
+  mutate(signif = ifelse(pval < .05, "*", "ns"))
 
-coxph(Surv(Correct.Interval, Vital.Status) ~ log(raw.1st.dim0.mean),
-      data = clinic.mom.df) %>%
-  summary
+multv.Cox("Vital.Status", "Survival.Correct.Interval", vars.to.check, clinic.mom.df.cancer.spec) %>% signif(2) %>% as.data.frame %>%
+  mutate(signif = ifelse(pval < .05, "*", "ns"))
 
-coxph(Surv(Correct.Interval, Vital.Status) ~ log(raw.1st.dim0.mean) + Age.Diag + Overall.Stage + Sex,
-      data = clinic.mom.df) %>%
-  summary
->>>>>>> 72af4f36942260c26257abb83c725a1433290221
-
-plot(log(clinic.mom.df$raw.1st.dim0.mean),
-     clinic.mom.df$Correct.Interval)
-
-clinic.mom.df <- mutate(clinic.mom.df, raw.mom.mean.log = log(raw.1st.dim0.mean))
-
-clinic.mom.df$cat <- factor(clinic.mom.df$cat,
-                            levels = c("Highest", "High", "Low", "Lowest"))
-
-ggsurvplot(
-  fit = survfit(Surv(Correct.Interval, Vital.Status) ~ cat, data = clinic.mom.df), 
-  xlab = "Days", 
-  legend.title = "Log of Raw Moment 1 of 0 Dimension Feature Curve",
-  ylab = "Overall survival probability"
-)
 
 ###PROPER PLOT HERE####
 #Adding A Moment 1 quartile Variable
@@ -416,64 +389,3 @@ kmcurve.stat <- kmcurve +
 kmcurve.stat
 
 
-#####DIAGNOSIS BOX####
-library(glmnet)
-
-
-<<<<<<< HEAD
-
-clinic.mom.df.lim <- clinic.mom.df %>% select(-c("Num.Prev.Canc.Diag", "HGB", "Path", "Histo", 
-                                                 "OS.Length", "Progression.Status", "PFS.Length", 
-                                                 "PFS.Failure.Type", "Local.Status", "Local.Length", "Lobar.Status", 
-                                                 "Nodal.Status", "Distant.Status", "First.Met", "Update.Time", 
-                                                 "Followup.Time", "Alive.Time"))
-
-clinic.mom.df.lim <- clinic.mom.df.lim %>% na.omit()
-
-
-
-#Surv Variables
-y <- clinic.mom.df.lim[, c("Correct.Interval", "Vital.Status")]
-y.surv <- Surv(time = y$Correct.Interval, event = y$Vital.Status)
-
-#Predictor Vars
-x <- clinic.mom.df.lim[, c("Sex", "Ethnicity", "Age.Diag", "BMI", 
-                       "Years.Smoke", "KPS", "CCI", "Prev.Canc.Diag", "Prior.Surg", 
-                       "Post.Rad.Chemo", "Pre.Rad.Chemo", "Rad.Intent", "Tot.Dose", 
-                       "CT.Size", "T.Stage", "N.Stage", "M.Stage", "Overall.Stage", 
-                       "raw.1st.dim0.mean", "raw.2nd.dim0", "raw.3rd.dim0", "raw.4th.dim0", 
-                       "cent.2nd.dim0.variance", "cent.3rd.dim0", "cent.4th.dim0", "stand.1st.dim0", 
-                       "stand.2nd.dim0", "stand.3rd.dim0", "stand.4th.dim0", "standcent.3rd.dim0.skew", 
-                       "standcent.4th.dim0.kurt", "raw.1st.dim1.mean", "raw.2nd.dim1", 
-                       "raw.3rd.dim1", "raw.4th.dim1", "cent.2nd.dim1.variance", "cent.3rd.dim1", 
-                       "cent.4th.dim1", "stand.1st.dim1", "stand.2nd.dim1", "stand.3rd.dim1", 
-                       "stand.4th.dim1", "standcent.3rd.dim1.skew", "standcent.4th.dim1.kurt", 
-                       "raw.1st.dim2.mean", "raw.2nd.dim2", "raw.3rd.dim2", "raw.4th.dim2", 
-                       "cent.2nd.dim2.variance", "cent.3rd.dim2", "cent.4th.dim2", "stand.1st.dim2", 
-                       "stand.2nd.dim2", "stand.3rd.dim2", "stand.4th.dim2", "standcent.3rd.dim2.skew", 
-                       "standcent.4th.dim2.kurt", "raw.1st.dimtot.mean", "raw.2nd.dimtot", 
-                       "raw.3rd.dimtot", "raw.4th.dimtot", "cent.2nd.dimtot.variance", 
-                       "cent.3rd.dimtot", "cent.4th.dimtot", "stand.1st.dimtot", "stand.2nd.dimtot", 
-                       "stand.3rd.dimtot", "stand.4th.dimtot", "standcent.3rd.dimtot.skew", 
-                       "standcent.4th.dimtot.kurt")]
-
-fit <- glmnet(x, y.surv, family = "cox")
-
-coef(fit, s = .05)
-
-cvfit <- cv.glmnet(as.matrix(x), y.surv, family = "cox", type.measure = "C")
-
-
-coxph(y.surv ~ x.mat)
-
-x.mat <- as.matrix.data.frame(x)
-
-#####DIAGNOSIS BOX####
-
-
-
-
-
-=======
-#####DIAGNOSIS BOX####
->>>>>>> 72af4f36942260c26257abb83c725a1433290221
