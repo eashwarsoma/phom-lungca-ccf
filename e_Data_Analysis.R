@@ -22,6 +22,7 @@ library(png)
 library(rstatix)
 library(ggfortify)
 library(stringr)
+library(hablar)
 
 #Function to linearly scale something to 0 to 1
 normalize <- function(col) {
@@ -115,36 +116,132 @@ clinic.extracter <- function(list.data, patient.vars, treatment.vars, tumor.vars
   return(fin.vec)
   
 }
+#COMEBACK WITH VARIABLE SELECTION
 
 #Replicating Old Paper Results
-moms.list <- lapply(list.all.data, moment.extracter, mom.dims = "dim0", mom.types = "raw")
+moms.list <- lapply(list.all.data, moment.extracter, mom.dims = mom.dim.vars, mom.types = mom.types.vars)
 moms.df <- as.data.frame(do.call(rbind, moms.list))
 
+#Rounding and filtering out 1 and 0 columns
+moms.df[, -1] <- moms.df[, -1] %>% sapply(as.numeric) %>% round(5) %>% as.data.frame()
 
-clinic.list <- lapply(list.all.data, clinic.extracter, patient.vars = c("Sex", "Age.Diag"), treatment.vars = NULL,
-                      tumor.vars = "Overall.Stage", event.vars = c("Vital.Status", "OS.Length", "Followup.Time"))
+vecs <- sapply(moms.df, function (x) all(x == 0))
+vecs2 <- sapply(moms.df, function (x) all(x == .999))
+
+#Due to NAs, need to remove standcent dim 2 stuff manually
+moms.df.corr <- moms.df[, -which(vecs == TRUE | vecs2 == TRUE)] %>% select(-c("standcent.1st.dim2", "standcent.2nd.dim2"))
+
+#Logging...note produces expected NAs
+moms.df.corr[moms.df.corr == 0] <- NA
+moms.df.corr[, -1] <- moms.df.corr[, -1] %>% log()
+
+
+clinic.list <- lapply(list.all.data, clinic.extracter, patient.vars = patient.vars, treatment.vars = treatment.vars,
+                      tumor.vars = tumor.vars, event.vars = event.vars)
 clinic.df <- as.data.frame(do.call(rbind, clinic.list))
 
+#making proper numeric
+clinic.df[, c("Vital.Status", "OS.Length", "Progression.Status", "PFS.Length", 
+              "Local.Status", "Local.Length", "Lobar.Status", 
+              "Nodal.Status", "Distant.Status", "Update.Time", 
+              "Followup.Time", "Alive.Time", "Age.Diag", "CCI",
+              "BMI", "Years.Smoke", "HGB", "Num.Prev.Canc.Diag", "Tot.Dose", "CT.Size")] <- 
+  sapply(clinic.df[, c("Vital.Status", "OS.Length", "Progression.Status", "PFS.Length", 
+                "Local.Status", "Local.Length", "Lobar.Status", 
+                "Nodal.Status", "Distant.Status", "Update.Time", 
+                "Followup.Time", "Alive.Time", "Age.Diag", "CCI",
+                "BMI", "Years.Smoke", "HGB", "Num.Prev.Canc.Diag", "Tot.Dose", "CT.Size")], as.numeric)
+
+
 #Combining moments and clinical vairable data frames
-clinic.mom.df <- join(clinic.df, moms.df)
+clinic.mom.df <- join(clinic.df, moms.df.corr)
+
+sapply(clinic.mom.df, function(x) paste(sum(!is.na(x)), "/", length(x)))
 
 #Creating a corrected Interval column that uses survival or follow up time
-clinic.mom.df$Correct.Interval <- ifelse(clinic.mom.df$Vital.Status == "1", clinic.mom.df$OS.Length, clinic.mom.df$Followup.Time)
-clinic.mom.df$Correct.Interval <- as.numeric(clinic.mom.df$Correct.Interval)
-clinic.mom.df$Age.Diag <- as.numeric(clinic.mom.df$Age.Diag)
-clinic.mom.df$raw.1st.dim0.mean <- as.numeric(clinic.mom.df$raw.1st.dim0.mean)
-clinic.mom.df$raw.2nd.dim0 <- as.numeric(clinic.mom.df$raw.2nd.dim0)
-clinic.mom.df$raw.3rd.dim0 <- as.numeric(clinic.mom.df$raw.3rd.dim0)
-clinic.mom.df$raw.4th.dim0 <- as.numeric(clinic.mom.df$raw.4th.dim0)
-clinic.mom.df$Vital.Status <- as.numeric(clinic.mom.df$Vital.Status)
+clinic.mom.df$Correct.Interval <- as.numeric(ifelse(clinic.mom.df$Vital.Status == "1", clinic.mom.df$OS.Length, clinic.mom.df$Followup.Time))
 
-summary(coxph(Surv(Correct.Interval, Vital.Status) ~ log(raw.1st.dim0.mean), data = clinic.mom.df))
+#Basic Cox Model
+univ.Cox <- function(stat, int, vars, dat) {
+  #List object to collect data
+  list.UR <- list()
+  #For loop to run through all the vars
+  for (i in 1:length(vars)) {
+    #Creating the relevant formula
+    form <- as.formula(paste("Surv(", int, ",", stat, ")", "~", vars[i], sep = ""))
+    
+    #Computing the Cox Model
+    res.cox <- coxph(form, data = dat)
+    
+    # CI
+    CI <- exp(confint(res.cox))
+    
+    #Original HR
+    HR <- exp(coef(res.cox))
+    
+    #Pvalue
+    pval <- summary(res.cox)$coefficients[,5]
+    
+    #Collecting the data and sticking it into the list
+    list.UR[[i]] <- cbind(HR, CI, pval)
+    
+  }
+  
+  #With the list object, turn it into a data frame
+  df.UR <- do.call(rbind, list.UR)
+  
+  return(df.UR)
+  
+}
+multv.Cox <- function(stat, int, vars, dat) {
+  #Creating the relevant formula
+  form <- as.formula(paste(paste("Surv(", int, ",", stat, ")"), 
+                           paste(vars, collapse=" + "), sep=" ~ "))
+  
+  #Computing the Cox Model
+  res.cox <- coxph(form, data = dat)
+  
+  #lower CI
+  CI <- exp(confint(res.cox))
+  
+  
+  
+  #Original HR
+  HR <- exp(coef(res.cox))
+  
+  #Pvalue
+  pval <- summary(res.cox)$coefficients[,5]
+  
+  df.mr <- cbind(HR, CI, pval)
+  
+  return(df.mr)
+}
 
-summary(coxph(Surv(Correct.Interval, Vital.Status) ~ log(raw.1st.dim0.mean) + Age.Diag + Overall.Stage + Sex, data = clinic.mom.df))
 
-plot(log(clinic.mom.df$raw.1st.dim0.mean), clinic.mom.df$Correct.Interval)
+univ.Cox("Vital.Status", "Correct.Interval", 
+         c("raw.1st.dim0.mean", "raw.1st.dim1.mean", 
+           "cent.2nd.dim0.variance", "cent.2nd.dim1.variance", 
+           "Age.Diag", "Sex", 
+           "KPS", "CCI", 
+           "Overall.Stage"), clinic.mom.df) %>% signif(3) %>% as.data.frame %>%
+  mutate(signif = ifelse(pval < .05, "*", "ns"))
 
-clinic.mom.df$raw.mom.mean.log <- log(clinic.mom.df$raw.1st.dim0.mean)
+multv.Cox("Vital.Status", "Correct.Interval", 
+         c("raw.1st.dim0.mean", "raw.1st.dim1.mean", 
+           "cent.2nd.dim0.variance", "cent.2nd.dim1.variance", 
+           "Age.Diag", "Sex", 
+           "KPS", "CCI", 
+           "Overall.Stage"), clinic.mom.df) %>% signif(3) %>% as.data.frame %>%
+  mutate(signif = ifelse(pval < .05, "*", "ns"))
+
+
+
+
+
+#Lasso model
+
+
+
 
 
 
@@ -269,10 +366,57 @@ kmcurve.stat
 
 
 #####DIAGNOSIS BOX####
+library(glmnet)
 
+
+
+clinic.mom.df.lim <- clinic.mom.df %>% select(-c("Num.Prev.Canc.Diag", "HGB", "Path", "Histo", 
+                                                 "OS.Length", "Progression.Status", "PFS.Length", 
+                                                 "PFS.Failure.Type", "Local.Status", "Local.Length", "Lobar.Status", 
+                                                 "Nodal.Status", "Distant.Status", "First.Met", "Update.Time", 
+                                                 "Followup.Time", "Alive.Time"))
+
+clinic.mom.df.lim <- clinic.mom.df.lim %>% na.omit()
+
+
+
+#Surv Variables
+y <- clinic.mom.df.lim[, c("Correct.Interval", "Vital.Status")]
+y.surv <- Surv(time = y$Correct.Interval, event = y$Vital.Status)
+
+#Predictor Vars
+x <- clinic.mom.df.lim[, c("Sex", "Ethnicity", "Age.Diag", "BMI", 
+                       "Years.Smoke", "KPS", "CCI", "Prev.Canc.Diag", "Prior.Surg", 
+                       "Post.Rad.Chemo", "Pre.Rad.Chemo", "Rad.Intent", "Tot.Dose", 
+                       "CT.Size", "T.Stage", "N.Stage", "M.Stage", "Overall.Stage", 
+                       "raw.1st.dim0.mean", "raw.2nd.dim0", "raw.3rd.dim0", "raw.4th.dim0", 
+                       "cent.2nd.dim0.variance", "cent.3rd.dim0", "cent.4th.dim0", "stand.1st.dim0", 
+                       "stand.2nd.dim0", "stand.3rd.dim0", "stand.4th.dim0", "standcent.3rd.dim0.skew", 
+                       "standcent.4th.dim0.kurt", "raw.1st.dim1.mean", "raw.2nd.dim1", 
+                       "raw.3rd.dim1", "raw.4th.dim1", "cent.2nd.dim1.variance", "cent.3rd.dim1", 
+                       "cent.4th.dim1", "stand.1st.dim1", "stand.2nd.dim1", "stand.3rd.dim1", 
+                       "stand.4th.dim1", "standcent.3rd.dim1.skew", "standcent.4th.dim1.kurt", 
+                       "raw.1st.dim2.mean", "raw.2nd.dim2", "raw.3rd.dim2", "raw.4th.dim2", 
+                       "cent.2nd.dim2.variance", "cent.3rd.dim2", "cent.4th.dim2", "stand.1st.dim2", 
+                       "stand.2nd.dim2", "stand.3rd.dim2", "stand.4th.dim2", "standcent.3rd.dim2.skew", 
+                       "standcent.4th.dim2.kurt", "raw.1st.dimtot.mean", "raw.2nd.dimtot", 
+                       "raw.3rd.dimtot", "raw.4th.dimtot", "cent.2nd.dimtot.variance", 
+                       "cent.3rd.dimtot", "cent.4th.dimtot", "stand.1st.dimtot", "stand.2nd.dimtot", 
+                       "stand.3rd.dimtot", "stand.4th.dimtot", "standcent.3rd.dimtot.skew", 
+                       "standcent.4th.dimtot.kurt")]
+
+fit <- glmnet(x, y.surv, family = "cox")
+
+coef(fit, s = .05)
+
+cvfit <- cv.glmnet(as.matrix(x), y.surv, family = "cox", type.measure = "C")
+
+
+coxph(y.surv ~ x.mat)
+
+x.mat <- as.matrix.data.frame(x)
 
 #####DIAGNOSIS BOX####
-
 
 
 

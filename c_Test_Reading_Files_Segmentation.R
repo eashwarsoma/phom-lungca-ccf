@@ -100,6 +100,8 @@ names(list.cropped.scans) <- str_remove(list.files("/Users/somasue/Desktop/NIFTI
 saveRDS(list.cropped.scans, "list.cropped.scans.rds")
 
 #Testing Random Scans
+list.cropped.scans <- readRDS("list.cropped.scans.rds")
+
 slices3d(list.cropped.scans[[round(runif(1, 1, length(list.cropped.scans)))]])
 
 
