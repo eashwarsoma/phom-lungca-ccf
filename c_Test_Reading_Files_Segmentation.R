@@ -18,19 +18,21 @@ nscans.filenames[[755]]
 
 #Function to get the image and GTV indices
 #Selects all GTV files
-target.index <- lapply(nscans.filenames, function (x)
-{
-  c(grep("image.nii", x), grep("GTV", x))
-}
+target.index <- lapply(nscans.filenames,
+                       function(x) {
+                         c(grep("image.nii", x), grep("GTV", x))
+                       }
 )
 
 #Which files have no GTV. These may have a CTV or PTV or ITV, but exlcuding to be safe
-inds.to.cut <- which(unlist(lapply(target.index, function (x) isTRUE(length(x) < 2))) == TRUE)
-target.index <- target.index[-c(inds.to.cut)]
-nscans.filenames <- nscans.filenames[-c(inds.to.cut)]
+inds.to.cut <- lapply(target.index, function(x) return(length(x) < 2)) %>%
+  unlist %>%
+  which
+target.index <- target.index[-inds.to.cut]
+nscans.filenames <- nscans.filenames[-inds.to.cut]
 
 #Process to select the largest GTV file indicesif there are multiple
-for (i in 1:length(target.index)) {
+for (i in seq_len(length(target.index))) {
   #Only bother with the ones > 2 (2 representing the image index + GTV index)
   if (length(nscans.filenames[[i]][target.index[[i]]]) > 2) {
     #Gets all the GTV file indices
@@ -46,7 +48,7 @@ for (i in 1:length(target.index)) {
     inds.with.vertex <- lapply(Segs, function (x)  which(x > 0, arr.ind = TRUE))
     
     #Selects the index of the largest one
-    ind.to.take <- which(sapply(inds.with.vertex, dim)[1,] == max(sapply(inds.with.vertex, dim)[1,]))
+    ind.to.take <- which(sapply(inds.with.vertex, dim)[1, ] == max(sapply(inds.with.vertex, dim)[1, ]))
     
     #If there is a tie, keep the first
     ind.to.take <- ind.to.take[1]
@@ -64,7 +66,7 @@ for (i in 1:length(target.index)) {
 
 #Creating a new list of files with just the CT scan and Segment scan
 true.list.scans <- list()
-for (i in 1: length(target.index)) {
+for (i in seq_len(length(target.index))) {
   true.list.scans[[i]] <- nscans.filenames[[i]][target.index[[i]]]
 }
 
@@ -74,28 +76,30 @@ for (i in 1: length(target.index)) {
 #element 1 is the path name to the image.nii or CT scan
 #element 2 is the path name to the GTV.nii or segment scan
 scan.cropper <- function(paths) {
-CT <- readNIfTI(paths[1])
-Seg <- readNIfTI(paths[2])
-
-#Selecting the coordinates marked as a segmentation
-#Getting the boundary coordinates of the segment
-inds.with.vertex <- which(Seg > 0, arr.ind = TRUE)
-min.x <- min(inds.with.vertex[,1])
-max.x <- max(inds.with.vertex[,1])
-min.y <- min(inds.with.vertex[,2])
-max.y <- max(inds.with.vertex[,2])
-min.z <- min(inds.with.vertex[,3])
-max.z <- max(inds.with.vertex[,3])
-
-cropped.CT <- CT[min.x:max.x, min.y:max.y, min.z:max.z]
-return(cropped.CT)
+  CT <- readNIfTI(paths[1])
+  Seg <- readNIfTI(paths[2])
+  
+  #Selecting the coordinates marked as a segmentation
+  #Getting the boundary coordinates of the segment
+  inds.with.vertex <- which(Seg > 0, arr.ind = TRUE)
+  min.x <- min(inds.with.vertex[, 1])
+  max.x <- max(inds.with.vertex[, 1])
+  min.y <- min(inds.with.vertex[, 2])
+  max.y <- max(inds.with.vertex[, 2])
+  min.z <- min(inds.with.vertex[, 3])
+  max.z <- max(inds.with.vertex[, 3])
+  
+  cropped.CT <- CT[min.x:max.x, min.y:max.y, min.z:max.z]
+  return(cropped.CT)
 }
 
 #Cropping all the scans in the list
 list.cropped.scans <- lapply(true.list.scans, scan.cropper)
 
 #naming the cropped scans with patient ID
-names(list.cropped.scans) <- str_remove(list.files("/Users/somasue/Desktop/NIFTI", full.names = FALSE)[-c(inds.to.cut)], ".nii")
+names(list.cropped.scans) <- str_remove(list.files("/Users/somasue/Desktop/NIFTI",
+                                                   full.names = FALSE)[-inds.to.cut],
+                                        ".nii")
   
 saveRDS(list.cropped.scans, "list.cropped.scans.rds")
 
@@ -103,16 +107,3 @@ saveRDS(list.cropped.scans, "list.cropped.scans.rds")
 list.cropped.scans <- readRDS("list.cropped.scans.rds")
 
 slices3d(list.cropped.scans[[round(runif(1, 1, length(list.cropped.scans)))]])
-
-
-
-
-
-
-
-
-
-
-
-
-
