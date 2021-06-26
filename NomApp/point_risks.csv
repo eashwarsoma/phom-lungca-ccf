@@ -1,0 +1,37 @@
+"","predictor","value","points"
+"1","PHOM Score","-4",0
+"2","PHOM Score","-3",9
+"3","PHOM Score","-2",18
+"4","PHOM Score","-1",27
+"5","PHOM Score","0",36
+"6","PHOM Score","1",45
+"7","PHOM Score","2",55
+"8","PHOM Score","3",64
+"9","PHOM Score","4",73
+"10","PHOM Score","5",82
+"11","PHOM Score","6",91
+"12","PHOM Score","7",100
+"13","Age","45",0
+"14","Age","50",2
+"15","Age","55",4
+"16","Age","60",7
+"17","Age","65",9
+"18","Age","70",11
+"19","Age","75",13
+"20","Age","80",15
+"21","Age","85",17
+"22","Age","90",20
+"23","Age","95",22
+"24","Sex","Female",0
+"25","Sex","Male",12
+"26","KPS","KPS > 70",0
+"27","KPS","KPS ≤ 70",22
+"28","CCI","0-4",0
+"29","CCI","5-8",24
+"30","CCI","> 8",55
+"31","Overall Stage","IA",0
+"32","Overall Stage","IB",7
+"33","Overall Stage","IIA",15
+"34","Overall Stage","IIB",18
+"35","Post Radiation Chemo","No",2
+"36","Post Radiation Chemo","Yes",0

@@ -1,0 +1,13 @@
+name: LungCancerTDATest
+title: LungCancerTDATest
+username:
+account: eashwarsoma
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 4320019
+bundleId: 4757002
+url: https://eashwarsoma.shinyapps.io/LungCancerTDATest/
+when: 1624642121.3591
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: www/.DS_Store
